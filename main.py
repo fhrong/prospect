@@ -215,40 +215,25 @@ for nome, dados in empresas.items():
 # ====================================
 
 for nome, dados in list(empresas.items()):
-
     sleep(1)
-
     cnpj = dados["cnpj"]
-
     if not cnpj:
         continue
-
     try:
-
         resp = requests.get(
             f"https://api.opencnpj.org/{cnpj}?dataset=receita",
             timeout=10
         )
-
         if resp.status_code != 200:
-
             print(
-                f"Erro HTTP {resp.status_code} em {nome}"
-            )
-
+                f"Erro HTTP {resp.status_code} em {nome}")
             continue
-
         dados_json = resp.json()
-
         telefones = dados_json.get(
             "telefones",
-            []
-        )
-
+            [])
         telefone = None
-
         if telefones:
-
             telefone = (
                 f"({telefones[0].get('ddd', '')}) "
                 f"{telefones[0].get('numero', '')}"
@@ -257,8 +242,7 @@ for nome, dados in list(empresas.items()):
         nome_oficial = (
             dados_json.get("nome_fantasia")
             or dados_json.get("razao_social")
-            or nome
-        )
+            or nome)
 
         empresas[nome] = {
             "nome_original": nome,
@@ -267,20 +251,16 @@ for nome, dados in list(empresas.items()):
             "telefone": telefone,
             "email": dados_json.get("email"),
             "cidade": dados_json.get("municipio"),
-            "uf": dados_json.get("uf"),
-        }
+            "uf": dados_json.get("uf"),}
 
         print(
             f"{nome_oficial} | "
             f"{cnpj} | "
-            f"{telefone}"
-        )
+            f"{telefone}")
 
     except Exception as e:
 
-        print(
-            f"Erro em {nome}: {e}"
-        )
+        print(f"Erro em {nome}: {e}")
 
 # ====================================
 # RESULTADO FINAL
@@ -289,38 +269,16 @@ for nome, dados in list(empresas.items()):
 print("\n\nRESULTADO FINAL\n")
 
 for _, dados in empresas.items():
-
-    print(
-        f"Nome Original: {dados.get('nome_original')}"
-    )
-
-    print(
-        f"Nome Oficial: {dados.get('nome_oficial')}"
-    )
-
-    print(
-        f"CNPJ: {dados.get('cnpj')}"
-    )
-
-    print(
-        f"Telefone: {dados.get('telefone')}"
-    )
-
-    print(
-        f"Email: {dados.get('email')}"
-    )
-
-    print(
-        f"Cidade: {dados.get('cidade')}"
-    )
-
-    print(
-        f"UF: {dados.get('uf')}"
-    )
-
+    print(f"Nome Original: {dados.get('nome_original')}")
+    print(f"Nome Oficial: {dados.get('nome_oficial')}")
+    print(f"CNPJ: {dados.get('cnpj')}")
+    print(f"Telefone: {dados.get('telefone')}")
+    print(f"Email: {dados.get('email')}")
+    print(f"Cidade: {dados.get('cidade')}")
+    print(f"UF: {dados.get('uf')}")
     print("-" * 60)
-
 try:
     driver.quit()
 except:
     pass
+
