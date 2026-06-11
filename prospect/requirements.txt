@@ -2,3 +2,11 @@ undetected-chromedriver
 selenium
 requests
 unidecode
+
+# API
+fastapi
+uvicorn[standard]
+
+# Banco de dados
+sqlalchemy
+psycopg2-binary

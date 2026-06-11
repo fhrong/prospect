@@ -1,0 +1,29 @@
+# ──────────────────────────────────────────────
+# Banco de dados do Prospect (separado da Evolution API)
+#
+# Para subir:   docker-compose up -d
+# Para parar:   docker-compose down
+# ──────────────────────────────────────────────
+
+services:
+
+  prospect_db:
+    image: postgres:16-alpine
+    container_name: prospect_db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: prospect
+      POSTGRES_PASSWORD: prospect123
+      POSTGRES_DB: prospect
+    volumes:
+      - prospect_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prospect"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  prospect_db_data:
