@@ -1,28 +1,25 @@
 """
 pipeline.py — orquestra LeadFinder + Enrichment + Messaging
 
-Este é o script que roda uma campanha completa.
-Recebe um campaign_id já criado via API e executa o pipeline.
-
 Uso:
-    python -m app.pipeline <campaign_id>
+    python -m app.pipeline <campaign_id> <instance_name>
 
 Exemplo:
-    python -m app.pipeline 1
+    python -m app.pipeline 1 teste_local
 """
+
 import sys
 from app.database import SessionLocal
 from app.models import Campaign, Lead
-from app.services.lead_finder import buscar_empresas, criar_driver
+from app.services.lead_finder import buscar_empresas, criar_driver, get_proxy_from_provider, report_bad_proxy_to_provider
 from app.services.enrichment import buscar_cnpj, buscar_dados_receita
 from app.services.messaging import enviar_mensagem, montar_mensagem, verificar_numero
 
 
-def rodar_pipeline(campaign_id: int):
+def rodar_pipeline(campaign_id: int, instance_name: str):
     db = SessionLocal()
 
     try:
-        # ── Busca a campanha no banco ──────────────────────────
         campanha = db.query(Campaign).filter(Campaign.id == campaign_id).first()
         if not campanha:
             print(f"Campanha {campaign_id} não encontrada.")
@@ -32,80 +29,69 @@ def rodar_pipeline(campaign_id: int):
         campanha.status = "RUNNING"
         db.commit()
 
-        driver = criar_driver()
+        # ── 1. LeadFinder ──────────────────────────────────
+        print("\nBuscando empresas...")
+        nomes = buscar_empresas(campanha.query)  # já com troca automática de proxy
+        print(f"{len(nomes)} empresas encontradas.")
 
-        try:
-            # ── 1. LeadFinder ──────────────────────────────────
-            print("\nBuscando empresas...")
-            nomes = buscar_empresas(driver, campanha.query)
-            print(f"{len(nomes)} empresas encontradas.")
+        for nome in nomes:
+            ja_existe = db.query(Lead).filter(
+                Lead.campaign_id == campaign_id,
+                Lead.nome_original == nome,
+            ).first()
 
-            for nome in nomes:
+            if ja_existe:
+                print(f"  Pulando (já existe): {nome}")
+                continue
 
-                # Evita duplicatas na mesma campanha
-                ja_existe = db.query(Lead).filter(
-                    Lead.campaign_id == campaign_id,
-                    Lead.nome_original == nome,
-                ).first()
+            lead = Lead(campaign_id=campaign_id, nome_original=nome, status="NEW")
+            db.add(lead)
+            db.commit()
+            db.refresh(lead)
 
-                if ja_existe:
-                    print(f"  Pulando (já existe): {nome}")
-                    continue
+            # ── 2. Enrichment ──────────────────────────────
+            print(f"\nEnriquecendo: {nome}")
+            cnpj = buscar_cnpj(nome)  # função buscar_cnpj do jeito correto, tratando proxy internamente
 
-                # Cria o lead como NEW
-                lead = Lead(campaign_id=campaign_id, nome_original=nome, status="NEW")
-                db.add(lead)
-                db.commit()
-                db.refresh(lead)
+            if not cnpj:
+                continue
 
-                # ── 2. Enrichment ──────────────────────────────
-                print(f"\nEnriquecendo: {nome}")
-                cnpj = buscar_cnpj(driver, nome)
+            dados = buscar_dados_receita(cnpj, nome_fallback=nome)
+            if not dados:
+                continue
 
-                if not cnpj:
-                    continue
+            lead.nome_oficial = dados.get("nome_oficial")
+            lead.cnpj         = dados.get("cnpj")
+            lead.telefone     = dados.get("telefone")
+            lead.email        = dados.get("email")
+            lead.cidade       = dados.get("cidade")
+            lead.uf           = dados.get("uf")
+            lead.status       = "ENRICHED"
+            db.commit()
 
-                dados = buscar_dados_receita(cnpj, nome_fallback=nome)
-                if not dados:
-                    continue
+            # ── 3. Messaging ────────────────────────────────
+            if not lead.telefone:
+                print(f"  Sem telefone: {nome}")
+                continue
 
-                lead.nome_oficial = dados.get("nome_oficial")
-                lead.cnpj         = dados.get("cnpj")
-                lead.telefone     = dados.get("telefone")
-                lead.email        = dados.get("email")
-                lead.cidade       = dados.get("cidade")
-                lead.uf           = dados.get("uf")
-                lead.status       = "ENRICHED"
-                db.commit()
+            tem_whatsapp = verificar_numero(instance_name, lead.telefone)
+            if not tem_whatsapp:
+                print(f"  Sem WhatsApp: {lead.telefone}")
+                continue
 
-                # ── 3. Messaging (só se o plano incluir) ───────
-                # Por enquanto está habilitado para todos.
-                # Futuramente: checar campanha.plano antes de enviar.
-                if not lead.telefone:
-                    print(f"  Sem telefone: {nome}")
-                    continue
+            texto = montar_mensagem(
+                campanha.nicho,
+                lead.nome_oficial or nome,
+                lead.cidade or "",
+            )
 
-                tem_whatsapp = verificar_numero("teste_local", lead.telefone)
-                if not tem_whatsapp:
-                    print(f"  Sem WhatsApp: {lead.telefone}")
-                    continue
+            enviar_mensagem(instance_name, lead.telefone, texto)
 
-                texto = montar_mensagem(
-                    campanha.nicho,
-                    lead.nome_oficial or nome,
-                    lead.cidade or "",
-                )
+            lead.status = "CONTACTED"
+            lead.ultima_mensagem = texto
+            db.commit()
 
-                enviar_mensagem("teste_local", lead.telefone, texto)
-
-                lead.status         = "CONTACTED"
-                lead.ultima_mensagem = texto
-                db.commit()
-
-                print(f"  ✓ Mensagem enviada: {lead.nome_oficial}")
-
-        finally:
-            driver.quit()
+            print(f"  ✓ Mensagem enviada: {lead.nome_oficial}")
 
         campanha.status = "DONE"
         db.commit()
@@ -121,9 +107,11 @@ def rodar_pipeline(campaign_id: int):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Uso: python -m app.pipeline <campaign_id>")
+    if len(sys.argv) < 3:
+        print("Uso: python -m app.pipeline <campaign_id> <instance_name>")
         sys.exit(1)
 
     campaign_id = int(sys.argv[1])
-    rodar_pipeline(campaign_id)
+    instance_name = sys.argv[2]
+
+    rodar_pipeline(campaign_id, instance_name)

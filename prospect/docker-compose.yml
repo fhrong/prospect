@@ -12,7 +12,7 @@ services:
     container_name: prospect_db
     restart: always
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_USER: prospect
       POSTGRES_PASSWORD: prospect123
@@ -26,4 +26,4 @@ services:
       retries: 5
 
 volumes:
-  prospect_db_data:
+  prospect_db_data: {}
