@@ -30,13 +30,13 @@ def criar_driver(proxy=None, headless=True):
     options = uc.ChromeOptions()
     if proxy:
         options.add_argument(f"--proxy-server={proxy}")
-    return uc.Chrome(options=options, version_main=148, headless=headless)
+    return uc.Chrome(options=options, version_main=149, headless=headless)
 
 def buscar_empresas(query: str) -> list[str]:
     while True:
         proxy = get_proxy_from_provider()
         print(f"Usando proxy {proxy} para buscar empresas...")
-        driver = criar_driver(proxy, headless=True)
+        driver = criar_driver(proxy, headless=False)
         try:
             google_search = "https://www.google.com/search?q="
             driver.get(f"{google_search}{quote(query)}")
@@ -56,7 +56,17 @@ def buscar_empresas(query: str) -> list[str]:
                     break
                 driver.execute_script("window.scrollBy(0, 1000);")
                 sleep(0.5)
+
             if not mais_empresas:
+                # fallback: try finding by class name with its own loop
+                for _ in range(10):
+                    botoes = driver.find_elements(By.CLASS_NAME, "jRKCUd")
+                    if botoes:
+                        mais_empresas = botoes[0]
+                        break
+                    driver.execute_script("window.scrollBy(0, 1000);")
+                    sleep(0.5)
+            elif not mais_empresas:
                 raise Exception("Botão 'Mais empresas' não encontrado.")
             driver.get(mais_empresas.get_attribute("href"))
             sleep(2)

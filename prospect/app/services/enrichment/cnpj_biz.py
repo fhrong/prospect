@@ -21,6 +21,11 @@ def buscar_cnpj(nome: str) -> str | None:
             google_search = "https://www.google.com/search?q="
             driver.get(f"{google_search}{quote(nome)} CNPJ BIZ")
             sleep(3)
+            if "sorry/index" in driver.current_url or "recaptcha" in driver.current_url:
+                print("CAPTCHA detectado! Reportando proxy e tentando novo proxy...")
+                report_bad_proxy_to_provider(proxy)
+                driver.quit()
+                continue
 
             links = driver.find_elements(By.CSS_SELECTOR, 'a[jsname="UWckNb"]')
 

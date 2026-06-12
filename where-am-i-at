@@ -1,0 +1,49 @@
+I need to build a proxy provider that'll continuosly feed a list of
+proxy's that can be used with the latest tested ones at the top for
+quick reuse. That'll be a worker always running on background. After
+that, i need to integrate that within the Google scraping service so
+if a instance of a driver get's the captcha window, it reports the proxy it was using is not a reliable source anymore back to the worker
+so it removes the proxy from the proxy list and immediately change
+the proxy of the driver instance to keep going FROM WHERE IT STOPED.
+
+Next Step: Design and Build a Proxy Provider Service with Dynamic Health Management
+Objectives:
+Continuous Proxy Discovery and Testing
+
+Develop a background worker/service that:
+Periodically fetches fresh proxy lists from reliable sources.
+Continuously tests proxies for connectivity, anonymity, and Google accessibility.
+Maintains a live, prioritized proxy pool where the freshest and most reliable proxies appear at the top.
+Marks proxies as unhealthy promptly if they fail tests or trigger anti-bot defenses.
+Proxy Pool Persistence & Metadata
+
+Use a database or fast cache (Redis, etc.) to store the proxy list with metadata:
+Last tested timestamp
+Success/failure history and scores
+Current health status (active, banned, cooldown)
+Enable quick retrieval of the best proxy for use.
+Integration with Scraping Service
+
+Modify your scraping workers to:
+Request a proxy from the proxy provider service before or when starting a driver session.
+Detect when a CAPTCHA or block page appears during scraping.
+Report back immediately the proxy causing the issue.
+Upon receiving a bad proxy report, the proxy provider:
+Marks the proxy as unhealthy or removes it temporarily.
+Supplies a new fresh proxy to the scraping worker.
+The scraping worker switches to the new proxy seamlessly, without losing scraping progress (e.g., resumes from last known state, last page, or last successful query).
+Failover & Resilience
+
+Include logic for failover proxy switching:
+If the current proxy fails or is reported bad, switch proxies immediately.
+Avoid re-using recently banned proxies until cooldown expires.
+Metrics and Monitoring
+
+Track proxy usage, failure rates, and scraping success.
+Alert when proxy pool runs low or performance drops.
+Why this architecture?
+Efficiency: Workers don’t waste time validating proxies themselves.
+Scalability: Proxy provider can be scaled independently, handling thousands of proxies.
+Reliability: Fresh, tested proxies ensure less downtime and fewer captchas.
+Agility: Fast proxy switching keeps scraping continuous, minimizing lost data or time.
+Maintainability: Clear separation of concerns between proxy management and scraping logic.
