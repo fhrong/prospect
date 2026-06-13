@@ -4,8 +4,7 @@ from workers.proxy_service import (
     get_best_proxies,
     mark_proxy_bad,
 )
-#uvicorn workers.proxy_provider:app --reload --host 0.0.0.0 --port 8000
-
+#uvicorn workers.proxy_provider:app --reload --host 0.0.0.0 --port 8001
 router = APIRouter()
 
 

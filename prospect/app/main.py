@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from app.database import engine
 from app.models import Base
-from app.api import campaigns_router, leads_router
+# import routers
+from app.api import campaigns_router, leads_router, pipeline_router
 from workers.proxy_provider import router as proxy_provider_router
 #uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
@@ -19,6 +20,7 @@ app = FastAPI(
 app.include_router(campaigns_router)
 app.include_router(leads_router)
 app.include_router(proxy_provider_router)
+app.include_router(pipeline_router)
 
 
 @app.get("/")

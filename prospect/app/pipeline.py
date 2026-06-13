@@ -11,12 +11,12 @@ Exemplo:
 import sys
 from app.database import SessionLocal
 from app.models import Campaign, Lead
-from app.services.lead_finder import buscar_empresas, criar_driver, get_proxy_from_provider, report_bad_proxy_to_provider
+from app.services.lead_finder import buscar_empresas
 from app.services.enrichment import buscar_cnpj, buscar_dados_receita
 from app.services.messaging import enviar_mensagem, montar_mensagem, verificar_numero
 
 
-def rodar_pipeline(campaign_id: int, instance_name: str):
+def rodar_pipeline(campaign_id: int, instance_name: str, enviar: bool = True):
     db = SessionLocal()
 
     try:
@@ -74,24 +74,27 @@ def rodar_pipeline(campaign_id: int, instance_name: str):
                 print(f"  Sem telefone: {nome}")
                 continue
 
-            tem_whatsapp = verificar_numero(instance_name, lead.telefone)
-            if not tem_whatsapp:
-                print(f"  Sem WhatsApp: {lead.telefone}")
-                continue
+            if enviar:
+                tem_whatsapp = verificar_numero(instance_name, lead.telefone)
+                if not tem_whatsapp:
+                    print(f"  Sem WhatsApp: {lead.telefone}")
+                    continue
 
-            texto = montar_mensagem(
-                campanha.nicho,
-                lead.nome_oficial or nome,
-                lead.cidade or "",
-            )
+                texto = montar_mensagem(
+                    campanha.nicho,
+                    lead.nome_oficial or nome,
+                    lead.cidade or "",
+                )
 
-            enviar_mensagem(instance_name, lead.telefone, texto)
+                enviar_mensagem(instance_name, lead.telefone, texto)
 
-            lead.status = "CONTACTED"
-            lead.ultima_mensagem = texto
-            db.commit()
+                lead.status = "CONTACTED"
+                lead.ultima_mensagem = texto
+                db.commit()
 
-            print(f"  ✓ Mensagem enviada: {lead.nome_oficial}")
+                print(f"  ✓ Mensagem enviada: {lead.nome_oficial}")
+            else:
+                print(f"  (skip enviar) Mensagem não enviada para: {lead.nome_oficial or nome}")
 
         campanha.status = "DONE"
         db.commit()

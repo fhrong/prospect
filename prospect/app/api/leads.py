@@ -50,7 +50,6 @@ def listar_leads(
 
     return query.all()
 
-
 @router.patch("/{campaign_id}/leads/{lead_id}", response_model=LeadResponse)
 def atualizar_status_lead(
     campaign_id: int,

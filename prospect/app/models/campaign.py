@@ -24,6 +24,6 @@ class Campaign(Base):
 
     # Um campanha tem muitos leads
     leads: Mapped[list["Lead"]] = relationship("Lead", back_populates="campaign")
-
+    
     def __repr__(self) -> str:
         return f"<Campaign id={self.id} name={self.name!r} status={self.status}>"
